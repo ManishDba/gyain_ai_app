@@ -28,6 +28,7 @@ import CustomHtmlTable from "../components/tablehtml";
 import DynamicChart from "../components/botchart/DynamicChart";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useSelector } from "react-redux";
+import UseDataScreenHooks from "../Hooks/UseDataScreenHooks";
 import { useNavigation } from "@react-navigation/native";
 import { ENV } from "../../env";
 
@@ -188,7 +189,6 @@ const DataScreen = ({ route }) => {
     inputText,
     setInputText,
     filteredSlugs,
-    setCurrentPage,
     currentActiveSlug,
     isRecording,
     sttStatus,
@@ -196,7 +196,6 @@ const DataScreen = ({ route }) => {
     pulseAnim,
     flatListRef,
     paginationState,
-
     filtersByTable,
     activeFilterColumnsByTable,
     selectedKeyItems,
@@ -216,6 +215,7 @@ const DataScreen = ({ route }) => {
     handleUserMessageDoubleTap,
     formatCellValue,
   } = UseBotScreenHooks({ route });
+  const { fetchCorrespondents } = UseDataScreenHooks();
   const navigation = useNavigation();
 
   const categoryId = route?.params?.Cat_name;
@@ -228,8 +228,6 @@ const DataScreen = ({ route }) => {
   const correspondents = useSelector(
     (state) => state.askSlice.Category?.results || []
   );
-  const configData = useSelector((state) => state.usersSlice.config || {});
-  const { total_stop_words, decimal_stop_words } = configData;
   const allSlugs = [
     ...filteredSlugs,
     { id: 4383, name: "clear", display: "Clear All" },
@@ -249,6 +247,9 @@ const DataScreen = ({ route }) => {
     (slug) => slug.display !== "Clear" && slug.display !== "Clear All"
   );
 
+  useEffect(() => {
+    fetchCorrespondents();
+  }, []);
 
   // Function to parse key_items JSON string
   const parseKeyItems = (keyItemsString) => {

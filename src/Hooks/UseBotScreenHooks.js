@@ -1961,6 +1961,21 @@ const useDataScreenHooks = ({ route }) => {
     }
   };
 
+  const fetchCorrespondentdata = async () => {
+    try {
+      const response = await axios.get(endpoint.category());
+      setMatchSlugs(response.data.results);
+      const slugs = response.data.results
+        .filter((item) => item.division == "data")
+        .map((item) => item.display);
+      setFilteredSlugs(slugs);
+      dispatch(setCategory(response.data));
+ 
+    } catch (error) {
+      console.error("Error fetching correspondents:", error);
+    }
+  };
+
   return {
     lastTapRef,
     messages,
@@ -2006,6 +2021,7 @@ const useDataScreenHooks = ({ route }) => {
     analyzeDataForChart,
     prepareChartData,
     formatCellValue,
+    fetchCorrespondentdata,
     formatDate: (dateValue) => {
       if (!dateValue) return "";
       if (

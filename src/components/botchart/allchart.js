@@ -9,17 +9,6 @@ import {
   PanResponder,
   Animated,
 } from "react-native";
-import Svg, {
-  Circle,
-  Line,
-  Rect,
-  Text as SvgText,
-  Path,
-  G,
-  Defs,
-  LinearGradient,
-  Stop,
-} from "react-native-svg";
 import { LineChart, BarChart, PieChart } from "react-native-gifted-charts";
 
 const getMaxValue = (data) =>

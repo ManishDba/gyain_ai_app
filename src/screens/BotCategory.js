@@ -17,6 +17,7 @@ import {
   TextInput,
   Keyboard,
 } from "react-native";
+import UseDataScreenHooks from "../Hooks/UseDataScreenHooks";
 import { useSelector } from "react-redux";
 import { useNavigation } from "@react-navigation/native";
 import AuthHooks from "../Hooks/AuthHooks";
@@ -29,6 +30,7 @@ const CARD_WIDTH = width - 30; // Adjusted for list view with padding
 
 const BotCategory = () => {
   const navigation = useNavigation();
+  const { fetchCorrespondents } = UseDataScreenHooks();
   const { fetchConfig } = AuthHooks();
   const { fetchProfile } = useProfileHooks();
   const searchInputRef = useRef(null);
@@ -69,14 +71,16 @@ const BotCategory = () => {
   }, [categoryStack.length, filteredItems, rootCategories, searchText]);
 
   useEffect(() => {
+    fetchCorrespondents();
     fetchConfig();
     fetchProfile();
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    await fetchCorrespondents();
     setRefreshing(false);
-  }, []);
+  }, [fetchCorrespondents]);
 
   const normalize = (text) => text?.toLowerCase().trim().replace(/\s+/g, "-");
 
