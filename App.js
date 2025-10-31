@@ -1,46 +1,78 @@
-import React from 'react';
-import {
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import React from "react";
+import { Provider, useSelector } from "react-redux";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+// ✅ Only the imports you requested
+import LoginScreen from "./src/screens/LoginScreen";
+import DataScreen from "./src/screens/DataScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
+import MainLayout from "./src/components/MainLayout";
+import HeaderOnlyLayout from "./src/components/HeaderOnlyLayout";
+import store from "./src/store";
+import Loader from "./src/components/Loader";
+import BotCategory from "./src/screens/BotCategory";
+import SplashScreen from "./src/screens/SplashScreen";
+import PdfViewerScreen from "./src/components/PdfViewerScreen";
+import { NativeModules } from "react-native";
+console.log("Loaded native modules:", Object.keys(NativeModules));
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? '#000' : '#fff',
-    flex: 1,
-  };
+const Stack = createStackNavigator();
+
+const screens = [
+  { name: "DataScreen", component: DataScreen },
+  { name: "BotCategory", component: BotCategory },
+];
+
+const AppContent = () => {
+  const isLoading = useSelector((state) => state.loaderSlice);
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={backgroundStyle} edges={['top', 'bottom']}>
-        <StatusBar
-          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-          backgroundColor={backgroundStyle.backgroundColor}
-        />
-        <View style={styles.container}>
-          <Text style={styles.text}>Welcome to Gyain AI App!</Text>
-        </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
-  );
-}
+    <>
+      {isLoading && <Loader />}
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="SplashScreen"
+          screenOptions={{ headerShown: false, animationEnabled: false }}
+        >
+          <Stack.Screen name="SplashScreen" component={SplashScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  text: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-});
+          {screens.map(({ name, component }) => (
+            <Stack.Screen key={name} name={name}>
+              {({ route }) => (
+                <MainLayout route={route}>
+                  {React.createElement(component, { route })}
+                </MainLayout>
+              )}
+            </Stack.Screen>
+          ))}
+
+          <Stack.Screen name="Profile">
+            {() => (
+              <HeaderOnlyLayout>
+                <ProfileScreen />
+              </HeaderOnlyLayout>
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="PdfViewerScreen">
+            {({ route, navigation }) => (
+              <HeaderOnlyLayout>
+                <PdfViewerScreen route={route} navigation={navigation} />
+              </HeaderOnlyLayout>
+            )}
+          </Stack.Screen>
+        </Stack.Navigator>
+      </NavigationContainer>
+    </>
+  );
+};
+
+const App = () => (
+  <Provider store={store}>
+    <AppContent />
+  </Provider>
+);
 
 export default App;
