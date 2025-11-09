@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+
 import {
   View,
   Text,
@@ -189,22 +190,34 @@ const DataScreen = ({ route }) => {
     inputText,
     setInputText,
     filteredSlugs,
+    currentPage,
+    setCurrentPage,
     currentActiveSlug,
+    refreshing,
     isRecording,
     sttStatus,
     partialText,
     pulseAnim,
     flatListRef,
     paginationState,
+    isSpeaking,
+    isPaused,
     filtersByTable,
     activeFilterColumnsByTable,
+    lastTapRef,
     selectedKeyItems,
     periodTextsByTable,
     setSelectedKeyItems,
     toggleFilterInput,
     handleFilterChange,
     applyFilters,
+    isGenerating,
+    speak,
+    pause,
+    resume,
+    stop,
     setPaginationState,
+    handleRefresh,
     toggleRecording,
     sendMessage,
     handleSlugPress,
@@ -214,6 +227,7 @@ const DataScreen = ({ route }) => {
     isOnlyTotalNonEmpty,
     handleUserMessageDoubleTap,
     formatCellValue,
+    loadingDots,
   } = UseBotScreenHooks({ route });
   const { fetchCorrespondents } = UseDataScreenHooks();
   const navigation = useNavigation();
@@ -228,6 +242,8 @@ const DataScreen = ({ route }) => {
   const correspondents = useSelector(
     (state) => state.askSlice.Category?.results || []
   );
+  const configData = useSelector((state) => state.usersSlice.config || {});
+  const { total_stop_words, decimal_stop_words } = configData;
   const allSlugs = [
     ...filteredSlugs,
     { id: 4383, name: "clear", display: "Clear All" },
@@ -512,6 +528,30 @@ const DataScreen = ({ route }) => {
     const { type = "", text = "", data = {}, sender = "system" } = item;
 
     switch (type) {
+      case "loading":
+        return (
+          <View
+            style={{
+              alignSelf: "flex-start",
+              maxWidth: "95%",
+              marginVertical: 4,
+              padding: 12,
+              borderRadius: 12,
+              backgroundColor: "#e2e3e5",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Helvetica",
+                color: "black",
+                fontStyle: "italic",
+                fontSize: 15,
+              }}
+            >
+              Generating{loadingDots}
+            </Text>
+          </View>
+        );
       case "greeting": {
         const texts = text.split("~");
         return (
@@ -1219,6 +1259,11 @@ const DataScreen = ({ route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+            >
       <View style={styles.contentContainer}>
         <View style={styles.header}>
           {allSlugs.length > 0 && (
@@ -1313,11 +1358,20 @@ const DataScreen = ({ route }) => {
           <FlatList
             ref={flatListRef}
             data={messages}
-            renderItem={renderChat}
+            renderItem={({ item, index }) => (
+              <View
+                style={{
+                  marginBottom: index === messages.length - 1 ? 200 : 0,
+                }}
+              >
+                {renderChat({ item })}
+              </View>
+            )}
             keyExtractor={(item, index) => index.toString()}
             style={styles.messageList}
             contentContainerStyle={{ paddingBottom: 100 }}
             keyboardShouldPersistTaps="never"
+
             // refreshControl={
             //   <RefreshControl
             //     refreshing={refreshing}
@@ -1331,18 +1385,20 @@ const DataScreen = ({ route }) => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              multiline={true} // 👉 allows text flow in multiple lines
-              scrollEnabled={false} // lets TextInput grow naturally
+              multiline={true}
+              scrollEnabled={false}
               placeholder={
                 isRecording ? "Listening..." : "Enter your text here"
               }
               value={isRecording ? partialText || inputText : inputText}
               onChangeText={(text) => {
                 if (!isRecording) {
-                  setInputText(text);
+                  setInputText(text); // ✅ User type kar sakta hai
                 }
               }}
               onSubmitEditing={() => {
+                if (isGenerating) return; // ✅ Submit block during generation
+
                 if (
                   currentActiveSlug?.display === "Clear" ||
                   currentActiveSlug?.display === "Clear All" ||
@@ -1359,7 +1415,7 @@ const DataScreen = ({ route }) => {
                 sendMessage(isRecording ? partialText : inputText);
                 setShowAllSlugs(false);
               }}
-              editable={!isRecording}
+              editable={!isRecording} // ✅ User type kar sakta hai (only recording ke time nahi)
               blurOnSubmit={false}
             />
             {inputText.length > 0 && (
@@ -1373,7 +1429,7 @@ const DataScreen = ({ route }) => {
                 styles.micButton,
                 { backgroundColor: isRecording ? "#FF5733" : "#ffffffff" },
               ]}
-              disabled={sttStatus === "Audio config error"}
+              disabled={sttStatus === "Audio config error"} // ✅ Mic chalta rahega
             >
               <Animated.View
                 style={[
@@ -1395,6 +1451,8 @@ const DataScreen = ({ route }) => {
           </View>
           <TouchableOpacity
             onPress={() => {
+              if (isGenerating) return; // ✅ Block send during generation
+
               if (
                 currentActiveSlug?.display === "Clear" ||
                 currentActiveSlug?.display === "Clear All" ||
@@ -1405,15 +1463,17 @@ const DataScreen = ({ route }) => {
                 );
                 return;
               }
-              // Stop recording if active
               if (isRecording) {
                 toggleRecording();
               }
               sendMessage(inputText);
               setShowAllSlugs(false);
             }}
-            style={styles.sendButton}
-            disabled={!inputText.trim()}
+            style={[
+              styles.sendButton,
+              isGenerating && { opacity: 0.5 }, // ✅ Visual feedback
+            ]}
+            disabled={!inputText.trim() || isGenerating} // ✅ Send disable during generation
           >
             <Image
               source={Icons.Icon11}
@@ -1423,6 +1483,7 @@ const DataScreen = ({ route }) => {
         </View>
         {renderKeyItemsModal()}
       </View>
+       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -1558,6 +1619,7 @@ const styles = StyleSheet.create({
     borderColor: "#000000",
     borderRadius: 8,
     overflow: "hidden",
+    marginBottom: 50,
   },
   tableRow: {
     flexDirection: "row",

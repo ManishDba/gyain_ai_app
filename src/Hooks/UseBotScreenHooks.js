@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Keyboard, Platform, PermissionsAndroid, Animated } from "react-native";
+
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import VoiceToText, {
@@ -7,6 +8,7 @@ import VoiceToText, {
 } from "@appcitor/react-native-voice-to-text";
 
 import axios from "../../services/axios";
+import axiosWl from "../../services/axiosWl";
 import endpoint from "../../services/endpoint";
 
 import { setCategory } from "../reducers/ask.slice";
@@ -80,6 +82,8 @@ const useDataScreenHooks = ({ route }) => {
   );
   const [selectedKeyItems, setSelectedKeyItems] = useState({});
   const [periodTextsByTable, setPeriodTextsByTable] = useState({});
+  const [loadingDots, setLoadingDots] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const itemsPerPage = 7;
   const wsRef = useRef(null);
@@ -430,47 +434,89 @@ const useDataScreenHooks = ({ route }) => {
     });
   };
 
-  const sendMessage = async (message) => {
-    if (message.trim()) {
-      const lowerCaseMessage = message.trim().toLowerCase();
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { text: message, data: {}, type: "text", sender: "user" },
-      ]);
-      setInputText("");
-      Keyboard.dismiss();
-      if (greetings.includes(lowerCaseMessage)) {
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            text: "Hello! How can I help you?",
-            data: {},
-            type: "text",
-            sender: "system",
-          },
-        ]);
-        return;
-      }
-      let enrichedMessage = message;
-      if (selectedKeyItems && Object.keys(selectedKeyItems).length > 0) {
-        const filterMessageParts = Object.entries(selectedKeyItems)
-          .filter(([_, value]) => value && value !== "")
-          .map(([key, value]) => `${key} ${value}`);
 
-        if (filterMessageParts.length > 0) {
-          enrichedMessage = `${message} for ${filterMessageParts.join(
-            " and "
-          )}`;
-        }
-      }
-
-      // 📝 check what goes to API
-      // console.log("Message sent to API:", enrichedMessage);
-
-      const response = await callSourcesContextAPI(enrichedMessage);
-      await fetchQueryResult(enrichedMessage, response);
+  useEffect(() => {
+    let interval;
+    if (isGenerating) {
+      interval = setInterval(() => {
+        setLoadingDots((prev) => (prev.length < 6 ? prev + "." : ""));
+      }, 500);
+    } else {
+      setLoadingDots("");
     }
-  };
+    return () => clearInterval(interval);
+  }, [isGenerating]);
+
+const sendMessage = async (message) => {
+  if (!message.trim() || isGenerating) return; // ✅ Prevent if already generating
+
+  const lowerCaseMessage = message.trim().toLowerCase();
+
+  // Add user message
+  setMessages((prevMessages) => [
+    ...prevMessages,
+    { text: message, data: {}, type: "text", sender: "user" },
+  ]);
+
+  setInputText("");
+  Keyboard.dismiss();
+
+  // Greeting response
+  if (greetings.includes(lowerCaseMessage)) {
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      {
+        text: "Hello! How can I help you?",
+        data: {},
+        type: "text",
+        sender: "system",
+      },
+    ]);
+    return;
+  }
+
+  // Show "Generating..." loader message
+  setIsGenerating(true);
+  setMessages((prevMessages) => [
+    ...prevMessages,
+    { text: "Generating", data: {}, type: "loading", sender: "system" },
+  ]);
+
+  // Enrich message
+  let enrichedMessage = message;
+  if (selectedKeyItems && Object.keys(selectedKeyItems).length > 0) {
+    const filterMessageParts = Object.entries(selectedKeyItems)
+      .filter(([_, value]) => value && value !== "")
+      .map(([key, value]) => `${key} ${value}`);
+
+    if (filterMessageParts.length > 0) {
+      enrichedMessage = `${message} for ${filterMessageParts.join(" and ")}`;
+    }
+  }
+
+  try {
+    const response = await callSourcesContextAPI(enrichedMessage);
+    await fetchQueryResult(enrichedMessage, response);
+
+    // Remove loader
+    setIsGenerating(false);
+    setMessages((prevMessages) =>
+      prevMessages.filter((msg) => msg.type !== "loading")
+    );
+  } catch (error) {
+    console.error("Error:", error);
+    setIsGenerating(false);
+    setMessages((prevMessages) => [
+      ...prevMessages.filter((msg) => msg.type !== "loading"),
+      {
+        text: "Something went wrong. Please try again.",
+        data: {},
+        type: "text",
+        sender: "system",
+      },
+    ]);
+  }
+};
 
   const callSourcesContextAPI = async (query) => {
     try {
@@ -485,7 +531,7 @@ const useDataScreenHooks = ({ route }) => {
           user_query: query,
         };
 
-        const result = await axios.post(endpoint.sourcesContext(), payloadData);
+        const result = await axiosWl.post(endpoint.sourcesContext(), payloadData);
         if (result?.data && result.data.length > 0) {
           setApiResponse(result.data);
           return result.data;
@@ -588,7 +634,7 @@ const useDataScreenHooks = ({ route }) => {
       if (!hasPeriodInQuery) {
         if (savequeryId && savequeryId.length > 0) {
           sqIdOnlyPromises = savequeryId.map((idValue) =>
-            axios.get(endpoint.savedquerybyid(idValue))
+            axiosWl.get(endpoint.savedquerybyid(idValue))
           );
 
           sqResponses = await Promise.all(sqIdOnlyPromises);
@@ -606,7 +652,7 @@ const useDataScreenHooks = ({ route }) => {
       }
 
       const sqPromises = sqIndicatorsIds.map((id) =>
-        axios.post(endpoint.sqindicators(), {
+        axiosWl.post(endpoint.sqindicators(), {
           saved_query_id: id,
           qfilter: query,
           limit: 500,
@@ -615,7 +661,7 @@ const useDataScreenHooks = ({ route }) => {
       );
 
       const xlsPromises = xlsQueryItems.map(({ source, source_id }) =>
-        axios.post(endpoint.datasets_xlsquery(), {
+        axiosWl.post(endpoint.datasets_xlsquery(), {
           source_id,
           query_text: query,
           source,
@@ -626,7 +672,7 @@ const useDataScreenHooks = ({ route }) => {
 
       const aiDocPromise =
         docIds.length > 0 || apiIds.length > 0
-          ? axios.post(endpoint.searchAiDocument(), {
+          ? axiosWl.post(endpoint.searchAiDocument(), {
               query_text: query,
               api_ids: apiIds,
               doc_ids: docIds,
@@ -938,7 +984,7 @@ const useDataScreenHooks = ({ route }) => {
       setMessages([]);
       setApiResponse(null);
       try {
-        await axios.post(endpoint.clearContext(), { query: "Clear" });
+        await axiosWl.post(endpoint.clearContext(), { query: "Clear" });
       } catch (error) {
         console.error("Failed to clear context:", error);
       }
@@ -955,8 +1001,8 @@ const useDataScreenHooks = ({ route }) => {
     const keywordsText = { keywords: name };
     try {
       const results = await Promise.allSettled([
-        axios.post(endpoint.clearContext(), slugText),
-        axios.post(endpoint.docsourcesContext(), keywordsText),
+        axiosWl.post(endpoint.clearContext(), slugText),
+        axiosWl.post(endpoint.docsourcesContext(), keywordsText),
       ]);
 
       results.forEach((result, index) => {
@@ -992,6 +1038,7 @@ const useDataScreenHooks = ({ route }) => {
       return newMessages;
     });
   };
+
   const isValidNumberchart = (value) => {
     if (value === null || value === undefined || value === "") return false;
     const num = Number(value);
@@ -1886,7 +1933,36 @@ const useDataScreenHooks = ({ route }) => {
     }
   }, [messages]);
 
+  const speak = (text) => {
+    if (!text) return;
+    Speech.stop();
+    Speech.speak(text.replace(/<[^>]*>?/gm, ""), {
+      onStart: () => {
+        setIsSpeaking(true);
+        setIsPaused(false);
+      },
+      onDone: () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+      },
+    });
+  };
 
+  const pause = () => {
+    Speech.pause();
+    setIsPaused(true);
+  };
+
+  const resume = () => {
+    Speech.resume();
+    setIsPaused(false);
+  };
+
+  const stop = () => {
+    Speech.stop();
+    setIsSpeaking(false);
+    setIsPaused(false);
+  };
 
   const toggleFilterInput = (tableKey, columnName) => {
     setActiveFilterColumnsByTable((prev) => {
@@ -1961,21 +2037,6 @@ const useDataScreenHooks = ({ route }) => {
     }
   };
 
-  const fetchCorrespondentdata = async () => {
-    try {
-      const response = await axios.get(endpoint.category());
-      setMatchSlugs(response.data.results);
-      const slugs = response.data.results
-        .filter((item) => item.division == "data")
-        .map((item) => item.display);
-      setFilteredSlugs(slugs);
-      dispatch(setCategory(response.data));
- 
-    } catch (error) {
-      console.error("Error fetching correspondents:", error);
-    }
-  };
-
   return {
     lastTapRef,
     messages,
@@ -1999,6 +2060,8 @@ const useDataScreenHooks = ({ route }) => {
     filtersByTable,
     activeFilterColumnsByTable,
     selectedKeyItems,
+    loadingDots,
+    isGenerating,
     formatCellValue,
     setSelectedKeyItems,
     handleUserMessageDoubleTap,
@@ -2006,6 +2069,10 @@ const useDataScreenHooks = ({ route }) => {
     toggleFilterInput,
     handleFilterChange,
     applyFilters,
+    speak,
+    pause,
+    resume,
+    stop,
     setPaginationState,
     handleRefresh,
     toggleRecording,
@@ -2021,7 +2088,6 @@ const useDataScreenHooks = ({ route }) => {
     analyzeDataForChart,
     prepareChartData,
     formatCellValue,
-    fetchCorrespondentdata,
     formatDate: (dateValue) => {
       if (!dateValue) return "";
       if (

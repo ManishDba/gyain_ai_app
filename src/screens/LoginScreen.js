@@ -208,6 +208,11 @@ const LoginScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
+            <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+      >
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="never"
@@ -406,6 +411,7 @@ const LoginScreen = () => {
           </View>
         )}
       </ScrollView>
+        </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
