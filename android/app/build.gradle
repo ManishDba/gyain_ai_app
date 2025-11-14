@@ -17,9 +17,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.gyain_ai_app"
+    namespace "com.iffco.ai.gyan.hub.assistant"
     defaultConfig {
-        applicationId "com.gyain_ai_app"
+        applicationId "com.iffco.ai.gyan.hub.assistant"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
