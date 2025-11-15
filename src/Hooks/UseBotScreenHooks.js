@@ -268,17 +268,17 @@ const useDataScreenHooks = ({ route }) => {
 
     // ✅ Handle text columns
     if (isTextColumn) {
-      return cell && String(cell).trim() !== "" ? String(cell) : ""; // Empty instead of "—"
+      return cell && String(cell).trim() !== "" ? String(cell) : "";
     }
 
-    // ✅ Handle empty/null values - return empty string
+    // ✅ Handle empty/null values
     if (
       cell === null ||
       cell === "" ||
       cell === undefined ||
       cell === "Unknown"
     ) {
-      return ""; // Empty instead of "0.00"
+      return "";
     }
 
     // ✅ Handle valid numbers
@@ -296,23 +296,22 @@ const useDataScreenHooks = ({ route }) => {
       );
 
       if (isHashDecimalStop) {
-        // # wale columns: No comma, no decimal
+        // # columns: No comma, no decimal
         return num.toString();
       } else if (isDecimalStop) {
-        // Bina # wale decimal_stop_words: No decimal, but comma
+        // decimalStopWords: No decimals, but with commas
         return Math.round(num).toLocaleString("en-IN");
       } else {
-        // Normal columns: 2 decimals with comma
-        return Number.isInteger(num)
-          ? num.toLocaleString("en-IN")
-          : num.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            });
+        // ✅ Normal columns: always show 2 decimals (.00)
+        const formatted = num.toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        return formatted;
       }
     }
 
-    // ✅ Handle dates
+    // ✅ Handle date-like strings
     if (String(cell).includes("T")) {
       return String(cell).split("T")[0];
     }
@@ -434,7 +433,6 @@ const useDataScreenHooks = ({ route }) => {
     });
   };
 
-
   useEffect(() => {
     let interval;
     if (isGenerating) {
@@ -447,76 +445,76 @@ const useDataScreenHooks = ({ route }) => {
     return () => clearInterval(interval);
   }, [isGenerating]);
 
-const sendMessage = async (message) => {
-  if (!message.trim() || isGenerating) return; // ✅ Prevent if already generating
+  const sendMessage = async (message) => {
+    if (!message.trim() || isGenerating) return; // ✅ Prevent if already generating
 
-  const lowerCaseMessage = message.trim().toLowerCase();
+    const lowerCaseMessage = message.trim().toLowerCase();
 
-  // Add user message
-  setMessages((prevMessages) => [
-    ...prevMessages,
-    { text: message, data: {}, type: "text", sender: "user" },
-  ]);
-
-  setInputText("");
-  Keyboard.dismiss();
-
-  // Greeting response
-  if (greetings.includes(lowerCaseMessage)) {
+    // Add user message
     setMessages((prevMessages) => [
       ...prevMessages,
-      {
-        text: "Hello! How can I help you?",
-        data: {},
-        type: "text",
-        sender: "system",
-      },
+      { text: message, data: {}, type: "text", sender: "user" },
     ]);
-    return;
-  }
 
-  // Show "Generating..." loader message
-  setIsGenerating(true);
-  setMessages((prevMessages) => [
-    ...prevMessages,
-    { text: "Generating", data: {}, type: "loading", sender: "system" },
-  ]);
+    setInputText("");
+    Keyboard.dismiss();
 
-  // Enrich message
-  let enrichedMessage = message;
-  if (selectedKeyItems && Object.keys(selectedKeyItems).length > 0) {
-    const filterMessageParts = Object.entries(selectedKeyItems)
-      .filter(([_, value]) => value && value !== "")
-      .map(([key, value]) => `${key} ${value}`);
-
-    if (filterMessageParts.length > 0) {
-      enrichedMessage = `${message} for ${filterMessageParts.join(" and ")}`;
+    // Greeting response
+    if (greetings.includes(lowerCaseMessage)) {
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          text: "Hello! How can I help you?",
+          data: {},
+          type: "text",
+          sender: "system",
+        },
+      ]);
+      return;
     }
-  }
 
-  try {
-    const response = await callSourcesContextAPI(enrichedMessage);
-    await fetchQueryResult(enrichedMessage, response);
-
-    // Remove loader
-    setIsGenerating(false);
-    setMessages((prevMessages) =>
-      prevMessages.filter((msg) => msg.type !== "loading")
-    );
-  } catch (error) {
-    console.error("Error:", error);
-    setIsGenerating(false);
+    // Show "Generating..." loader message
+    setIsGenerating(true);
     setMessages((prevMessages) => [
-      ...prevMessages.filter((msg) => msg.type !== "loading"),
-      {
-        text: "Something went wrong. Please try again.",
-        data: {},
-        type: "text",
-        sender: "system",
-      },
+      ...prevMessages,
+      { text: "Generating", data: {}, type: "loading", sender: "system" },
     ]);
-  }
-};
+
+    // Enrich message
+    let enrichedMessage = message;
+    if (selectedKeyItems && Object.keys(selectedKeyItems).length > 0) {
+      const filterMessageParts = Object.entries(selectedKeyItems)
+        .filter(([_, value]) => value && value !== "")
+        .map(([key, value]) => `${key} ${value}`);
+
+      if (filterMessageParts.length > 0) {
+        enrichedMessage = `${message} for ${filterMessageParts.join(" and ")}`;
+      }
+    }
+
+    try {
+      const response = await callSourcesContextAPI(enrichedMessage);
+      await fetchQueryResult(enrichedMessage, response);
+
+      // Remove loader
+      setIsGenerating(false);
+      setMessages((prevMessages) =>
+        prevMessages.filter((msg) => msg.type !== "loading")
+      );
+    } catch (error) {
+      console.error("Error:", error);
+      setIsGenerating(false);
+      setMessages((prevMessages) => [
+        ...prevMessages.filter((msg) => msg.type !== "loading"),
+        {
+          text: "Something went wrong. Please try again.",
+          data: {},
+          type: "text",
+          sender: "system",
+        },
+      ]);
+    }
+  };
 
   const callSourcesContextAPI = async (query) => {
     try {
@@ -531,7 +529,10 @@ const sendMessage = async (message) => {
           user_query: query,
         };
 
-        const result = await axiosWl.post(endpoint.sourcesContext(), payloadData);
+        const result = await axiosWl.post(
+          endpoint.sourcesContext(),
+          payloadData
+        );
         if (result?.data && result.data.length > 0) {
           setApiResponse(result.data);
           return result.data;
@@ -1933,36 +1934,6 @@ const sendMessage = async (message) => {
     }
   }, [messages]);
 
-  const speak = (text) => {
-    if (!text) return;
-    Speech.stop();
-    Speech.speak(text.replace(/<[^>]*>?/gm, ""), {
-      onStart: () => {
-        setIsSpeaking(true);
-        setIsPaused(false);
-      },
-      onDone: () => {
-        setIsSpeaking(false);
-        setIsPaused(false);
-      },
-    });
-  };
-
-  const pause = () => {
-    Speech.pause();
-    setIsPaused(true);
-  };
-
-  const resume = () => {
-    Speech.resume();
-    setIsPaused(false);
-  };
-
-  const stop = () => {
-    Speech.stop();
-    setIsSpeaking(false);
-    setIsPaused(false);
-  };
 
   const toggleFilterInput = (tableKey, columnName) => {
     setActiveFilterColumnsByTable((prev) => {
@@ -2069,10 +2040,6 @@ const sendMessage = async (message) => {
     toggleFilterInput,
     handleFilterChange,
     applyFilters,
-    speak,
-    pause,
-    resume,
-    stop,
     setPaginationState,
     handleRefresh,
     toggleRecording,

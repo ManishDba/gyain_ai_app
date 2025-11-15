@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-
 import {
   View,
   Text,
@@ -12,6 +11,7 @@ import {
   Dimensions,
   ScrollView,
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -243,7 +243,30 @@ const DataScreen = ({ route }) => {
     (state) => state.askSlice.Category?.results || []
   );
   const configData = useSelector((state) => state.usersSlice.config || {});
-  const { total_stop_words, decimal_stop_words } = configData;
+
+const [keyboardHeight, setKeyboardHeight] = useState(0);
+const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+useEffect(() => {
+  const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+  const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+  const keyboardDidShowListener = Keyboard.addListener(showEvent, (e) => {
+    setKeyboardHeight(e.endCoordinates.height);
+    setIsKeyboardVisible(true);
+  });
+
+  const keyboardDidHideListener = Keyboard.addListener(hideEvent, () => {
+    setKeyboardHeight(0);
+    setIsKeyboardVisible(false);
+  });
+
+  return () => {
+    keyboardDidShowListener.remove();
+    keyboardDidHideListener.remove();
+  };
+}, []);
+
   const allSlugs = [
     ...filteredSlugs,
     { id: 4383, name: "clear", display: "Clear All" },
@@ -1258,12 +1281,7 @@ const DataScreen = ({ route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-            >
+    <View style={styles.container}>
       <View style={styles.contentContainer}>
         <View style={styles.header}>
           {allSlugs.length > 0 && (
@@ -1353,15 +1371,15 @@ const DataScreen = ({ route }) => {
           )}
         </View>
 
-        {/* Full-screen zoomable content area */}
-        <FullScreenZoomableContainer>
+       <FullScreenZoomableContainer>
           <FlatList
             ref={flatListRef}
             data={messages}
             renderItem={({ item, index }) => (
               <View
                 style={{
-                  marginBottom: index === messages.length - 1 ? 200 : 0,
+                  marginBottom: index === messages.length - 1 ? 
+                    (isKeyboardVisible ? keyboardHeight : 100) : 0, // ✅ Dynamic margin
                 }}
               >
                 {renderChat({ item })}
@@ -1369,43 +1387,58 @@ const DataScreen = ({ route }) => {
             )}
             keyExtractor={(item, index) => index.toString()}
             style={styles.messageList}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ 
+              paddingBottom: isKeyboardVisible ? keyboardHeight  : 20, // ✅ Dynamic padding
+              flexGrow: 1 
+            }}
             keyboardShouldPersistTaps="never"
-
-            // refreshControl={
-            //   <RefreshControl
-            //     refreshing={refreshing}
-            //     onRefresh={handleRefresh}
-            //   />
-            // }
+            onContentSizeChange={() => {
+              if (isKeyboardVisible) {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }
+            }}
           />
         </FullScreenZoomableContainer>
 
-        <View style={styles.footer}>
+        {/* Footer with dynamic positioning */}
+        <View style={[
+          styles.footer,
+          {
+            position: 'absolute', // ✅ Make it absolute
+            bottom: isKeyboardVisible ? keyboardHeight : 0, // ✅ Move with keyboard
+            left: 0,
+            right: 0,
+          }
+        ]}>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
               multiline={true}
               scrollEnabled={false}
               placeholder={
-                isRecording ? "Listening..." : "Enter your text here"
+                isRecording ? 'Listening...' : 'Enter your text here'
               }
               value={isRecording ? partialText || inputText : inputText}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 if (!isRecording) {
-                  setInputText(text); // ✅ User type kar sakta hai
+                  setInputText(text);
                 }
               }}
+              onFocus={() => {
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}
               onSubmitEditing={() => {
-                if (isGenerating) return; // ✅ Submit block during generation
+                if (isGenerating) return;
 
                 if (
-                  currentActiveSlug?.display === "Clear" ||
-                  currentActiveSlug?.display === "Clear All" ||
+                  currentActiveSlug?.display === 'Clear' ||
+                  currentActiveSlug?.display === 'Clear All' ||
                   !currentActiveSlug?.id
                 ) {
                   Alert.alert(
-                    "Please select any one of the Bot's options to continue."
+                    "Please select any one of the Bot's options to continue.",
                   );
                   return;
                 }
@@ -1415,11 +1448,14 @@ const DataScreen = ({ route }) => {
                 sendMessage(isRecording ? partialText : inputText);
                 setShowAllSlugs(false);
               }}
-              editable={!isRecording} // ✅ User type kar sakta hai (only recording ke time nahi)
+              editable={!isRecording}
               blurOnSubmit={false}
             />
             {inputText.length > 0 && (
-              <TouchableOpacity onPress={clearText} style={styles.clearButton}>
+              <TouchableOpacity
+                onPress={clearText}
+                style={styles.clearButton}
+              >
                 <Icon name="close" size={22} color="#000" />
               </TouchableOpacity>
             )}
@@ -1427,9 +1463,9 @@ const DataScreen = ({ route }) => {
               onPress={toggleRecording}
               style={[
                 styles.micButton,
-                { backgroundColor: isRecording ? "#FF5733" : "#ffffffff" },
+                { backgroundColor: isRecording ? '#FF5733' : '#ffffffff' },
               ]}
-              disabled={sttStatus === "Audio config error"} // ✅ Mic chalta rahega
+              disabled={sttStatus === 'Audio config error'}
             >
               <Animated.View
                 style={[
@@ -1437,29 +1473,29 @@ const DataScreen = ({ route }) => {
                   {
                     transform: [{ scale: pulseAnim }],
                     backgroundColor: isRecording
-                      ? "rgba(255, 87, 51, 0.3)"
-                      : "transparent",
+                      ? 'rgba(255, 87, 51, 0.3)'
+                      : 'transparent',
                   },
                 ]}
               >
                 <Image
                   source={Icons.Icon08}
-                  style={[styles.micImage, { tintColor: "#000" }]}
+                  style={[styles.micImage, { tintColor: '#000' }]}
                 />
               </Animated.View>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
             onPress={() => {
-              if (isGenerating) return; // ✅ Block send during generation
+              if (isGenerating) return;
 
               if (
-                currentActiveSlug?.display === "Clear" ||
-                currentActiveSlug?.display === "Clear All" ||
+                currentActiveSlug?.display === 'Clear' ||
+                currentActiveSlug?.display === 'Clear All' ||
                 !currentActiveSlug?.id
               ) {
                 Alert.alert(
-                  "Please select any one of the Bot's options to continue."
+                  "Please select any one of the Bot's options to continue.",
                 );
                 return;
               }
@@ -1471,20 +1507,19 @@ const DataScreen = ({ route }) => {
             }}
             style={[
               styles.sendButton,
-              isGenerating && { opacity: 0.5 }, // ✅ Visual feedback
+              isGenerating && { opacity: 0.5 },
             ]}
-            disabled={!inputText.trim() || isGenerating} // ✅ Send disable during generation
+            disabled={!inputText.trim() || isGenerating}
           >
             <Image
               source={Icons.Icon11}
-              style={[styles.sendImage, { tintColor: "#fff" }]}
+              style={[styles.sendImage, { tintColor: '#fff' }]}
             />
           </TouchableOpacity>
         </View>
-        {renderKeyItemsModal()}
       </View>
-       </KeyboardAvoidingView>
-    </SafeAreaView>
+      {renderKeyItemsModal()}
+    </View>
   );
 };
 
@@ -1544,11 +1579,12 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "bold",
   },
-  footer: {
+footer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 2,
-    padding: 1,
+    marginBottom: 22,
+    padding: 6,
+    zIndex: 10, // Keep footer above zoomable content
   },
   inputContainer: {
     flex: 1,
@@ -1562,8 +1598,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     Height: 40,
-    paddingHorizontal: 10,
-    paddingVertical: 6, // initial vertical padding centers single line
+    paddingHorizontal: 13,
+    paddingVertical: 13, // initial vertical padding centers single line
     textAlignVertical: "top", // text flows from top when multiple lines
     fontSize: 16,
     color: "#000",
@@ -1577,8 +1613,8 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   clearImage: {
-    width: 20,
-    height: 20,
+    width: 25,
+    height: 25,
   },
   micButton: {
     width: 36,
@@ -1597,21 +1633,21 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   micImage: {
-    width: 23,
-    height: 23,
+    width: 25,
+    height: 25,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 30,
     backgroundColor: "#174054",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 8,
   },
   sendImage: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
   },
   tableContainer: {
     marginVertical: 10,

@@ -1,18 +1,26 @@
-import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, StatusBar, Animated, ActivityIndicator } from "react-native";
+import { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  Animated,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch } from "react-redux";
-import { restoreAuthState } from '../reducers/auth.slice';
+import { restoreAuthState } from "../reducers/auth.slice";
 import { CommonActions } from "@react-navigation/native";
 import AuthHooks from "../Hooks/AuthHooks";
- 
+
 const SplashScreen = ({ navigation }) => {
   const [showSplash, setShowSplash] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateYAnim = useRef(new Animated.Value(20)).current;
   const dispatch = useDispatch();
-  const {fetchConfig}=AuthHooks()
- 
+  const { fetchConfig } = AuthHooks();
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -26,7 +34,7 @@ const SplashScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
- 
+
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem("auth_token");
@@ -59,34 +67,34 @@ const SplashScreen = ({ navigation }) => {
         );
       }
     };
-    
-    
- 
+
     // wait splash animation, then check auth
     const timer = setTimeout(() => {
       setShowSplash(false);
       checkAuth();
     }, 3000);
- 
+
     return () => clearTimeout(timer);
   }, [fadeAnim, translateYAnim, dispatch, navigation]);
- 
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#142440" />
       {showSplash ? (
         <View style={styles.splashContainer}>
-          <Animated.Text
+          <Animated.View
             style={[
-              styles.splashText,
+              styles.splashContainer,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: translateYAnim }],
               },
             ]}
           >
-            Welcome to IFFCO AI Gyan Hub
-          </Animated.Text>
+            <Text style={styles.welcomeText}>Welcome</Text>
+            <Text style={styles.welcomeText}>To</Text>
+            <Text style={styles.welcomeText}>IFFCO AI Gyan Hub</Text>
+          </Animated.View>
         </View>
       ) : (
         <View style={styles.loaderContainer}>
@@ -96,7 +104,7 @@ const SplashScreen = ({ navigation }) => {
     </View>
   );
 };
- 
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   splashContainer: {
@@ -105,12 +113,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  splashText: {
-    fontSize: 36,
-    fontWeight: "bold",
+  welcomeText: {
     color: "#FFFFFF",
-    letterSpacing: 1.5,
+    fontSize: 28,
+    fontWeight: "600",
     textAlign: "center",
+    marginVertical: 2,
+    fontFamily: Platform.select({
+      ios: "Comic Sans MS",
+      android: "sans-serif-medium",
+    }),
   },
   loaderContainer: {
     flex: 1,
@@ -119,5 +131,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 });
- 
+
 export default SplashScreen;
