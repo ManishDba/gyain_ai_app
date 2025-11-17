@@ -978,8 +978,10 @@ const useDataScreenHooks = ({ route }) => {
   };
 
   const handleSlugPress = async (slug) => {
-    // slug is now an object: { id, display, ... }
-    setCurrentActiveSlug(slug);
+      if (currentActiveSlug?.id === slug.id) {
+    return;
+  }
+  setCurrentActiveSlug(slug);
 
     if (slug.display === "Clear" || slug.display === "Clear All") {
       setMessages([]);
@@ -1927,13 +1929,6 @@ const useDataScreenHooks = ({ route }) => {
   useEffect(() => {
     fetchCorrespondents();
   }, []);
-
-  useEffect(() => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
-
 
   const toggleFilterInput = (tableKey, columnName) => {
     setActiveFilterColumnsByTable((prev) => {

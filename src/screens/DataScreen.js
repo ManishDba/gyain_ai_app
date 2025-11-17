@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -1281,7 +1281,7 @@ useEffect(() => {
   };
 
   return (
-    <View style={styles.container}>
+<View style={styles.container}>
       <View style={styles.contentContainer}>
         <View style={styles.header}>
           {allSlugs.length > 0 && (
@@ -1379,7 +1379,7 @@ useEffect(() => {
               <View
                 style={{
                   marginBottom: index === messages.length - 1 ? 
-                    (isKeyboardVisible ? keyboardHeight : 100) : 0, // ✅ Dynamic margin
+                    (isKeyboardVisible ? keyboardHeight : 100) : 0,
                 }}
               >
                 {renderChat({ item })}
@@ -1388,14 +1388,42 @@ useEffect(() => {
             keyExtractor={(item, index) => index.toString()}
             style={styles.messageList}
             contentContainerStyle={{ 
-              paddingBottom: isKeyboardVisible ? keyboardHeight  : 20, // ✅ Dynamic padding
+              paddingBottom: isKeyboardVisible ? keyboardHeight : 0,
               flexGrow: 1 
             }}
             keyboardShouldPersistTaps="never"
-            onContentSizeChange={() => {
-              if (isKeyboardVisible) {
-                flatListRef.current?.scrollToEnd({ animated: true });
+            onLayout={() => {
+              // Scroll to show last user message when layout changes
+              if (messages.length >= 2) {
+                const lastUserMsgIndex = messages.length - 2; // User message is second last
+                flatListRef.current?.scrollToIndex({
+                  index: lastUserMsgIndex,
+                  animated: true,
+                  viewPosition: 0, // Position at top of screen
+                });
               }
+            }}
+            onContentSizeChange={() => {
+              // When new message arrives, scroll to show last user message at top
+              if (messages.length >= 2) {
+                setTimeout(() => {
+                  const lastUserMsgIndex = messages.length - 2;
+                  flatListRef.current?.scrollToIndex({
+                    index: lastUserMsgIndex,
+                    animated: true,
+                    viewPosition: 0, // User message at top, response below
+                  });
+                }, 100);
+              }
+            }}
+            onScrollToIndexFailed={(info) => {
+              // Fallback if scrollToIndex fails
+              setTimeout(() => {
+                flatListRef.current?.scrollToOffset({
+                  offset: info.averageItemLength * info.index,
+                  animated: true,
+                });
+              }, 100);
             }}
           />
         </FullScreenZoomableContainer>
@@ -1404,10 +1432,7 @@ useEffect(() => {
         <View style={[
           styles.footer,
           {
-            position: 'absolute', // ✅ Make it absolute
-            bottom: isKeyboardVisible ? keyboardHeight : 0, // ✅ Move with keyboard
-            left: 0,
-            right: 0,
+            bottom: isKeyboardVisible ? keyboardHeight : 0,
           }
         ]}>
           <View style={styles.inputContainer}>
@@ -1423,11 +1448,6 @@ useEffect(() => {
                 if (!isRecording) {
                   setInputText(text);
                 }
-              }}
-              onFocus={() => {
-                setTimeout(() => {
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
               }}
               onSubmitEditing={() => {
                 if (isGenerating) return;

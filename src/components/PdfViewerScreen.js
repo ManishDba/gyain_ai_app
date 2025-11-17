@@ -86,7 +86,7 @@ const PdfViewerScreen = ({ route }) => {
           setError(`Failed to render PDF: ${err.message}`);
         }}
         horizontal={false}
-        enablePaging={true}
+        enablePaging={false}
         page={page}
       />
  
