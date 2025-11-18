@@ -238,34 +238,13 @@ const DataScreen = ({ route }) => {
   const [sortStateByTable, setSortStateByTable] = useState({});
   const [showKeyItemsModal, setShowKeyItemsModal] = useState(false);
   const [selectedKeyItemCategory, setSelectedKeyItemCategory] = useState(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showAllSlugs, setShowAllSlugs] = useState(false);
   const correspondents = useSelector(
     (state) => state.askSlice.Category?.results || []
   );
   const configData = useSelector((state) => state.usersSlice.config || {});
 
-const [keyboardHeight, setKeyboardHeight] = useState(0);
-const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-useEffect(() => {
-  const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-  const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-  const keyboardDidShowListener = Keyboard.addListener(showEvent, (e) => {
-    setKeyboardHeight(e.endCoordinates.height);
-    setIsKeyboardVisible(true);
-  });
-
-  const keyboardDidHideListener = Keyboard.addListener(hideEvent, () => {
-    setKeyboardHeight(0);
-    setIsKeyboardVisible(false);
-  });
-
-  return () => {
-    keyboardDidShowListener.remove();
-    keyboardDidHideListener.remove();
-  };
-}, []);
 
   const allSlugs = [
     ...filteredSlugs,
@@ -1280,271 +1259,230 @@ useEffect(() => {
     setInputText("");
   };
 
-  return (
-<View style={styles.container}>
-      <View style={styles.contentContainer}>
-        <View style={styles.header}>
-          {allSlugs.length > 0 && (
-            <>
-              <View style={styles.firstRow}>
-                {/* For categories 79 and 29: show first slug + Clear All button */}
-                {categoryId === 79 || categoryId === 29 ? (
-                  <>
-                    {/* First slug or all slugs in a row */}
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        flex: 1,
-                      }}
-                    >
-                      {displaySlugs.slice(0, 1).map((item, index) => (
-                        <View key={index}>{renderSlug({ item })}</View>
-                      ))}
-                    </View>
 
-                    {/* Clear All button in right corner - only show when slugs exist */}
-                    {displaySlugs.length > 0 &&
-                      allSlugs.some((s) => s.display === "Clear All") && (
-                        <View>
-                          {renderSlug({
-                            item: allSlugs.find(
-                              (s) => s.display === "Clear All"
-                            ),
-                          })}
-                        </View>
-                      )}
-                  </>
-                ) : (
-                  /* Active slug for other categories */
-                  <>
-                    {activeSlug && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          flexWrap: "wrap",
-                          flex: 1,
-                        }}
-                      >
-                        {renderSlug({ item: activeSlug })}
+useEffect(() => {
+  const keyboardDidShowListener = Keyboard.addListener(
+    'keyboardDidShow',
+    (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    }
+  );
+  const keyboardDidHideListener = Keyboard.addListener(
+    'keyboardDidHide',
+    () => {
+      setKeyboardHeight(0);
+    }
+  );
+
+  return () => {
+    keyboardDidShowListener.remove();
+    keyboardDidHideListener.remove();
+  };
+}, []);
+
+return (
+  <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
+    <View style={{ flex: 1 }}>
+      {/* ==================== HEADER WITH SLUGS ==================== */}
+      <View style={styles.header}>
+        {allSlugs.length > 0 && (
+          <>
+            <View style={styles.firstRow}>
+              {categoryId === 79 || categoryId === 29 ? (
+                <>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", flex: 1 }}>
+                    {displaySlugs.slice(0, 1).map((item, index) => (
+                      <View key={index}>{renderSlug({ item })}</View>
+                    ))}
+                  </View>
+
+                  {displaySlugs.length > 0 &&
+                    allSlugs.some((s) => s.display === "Clear All") && (
+                      <View>
+                        {renderSlug({
+                          item: allSlugs.find((s) => s.display === "Clear All"),
+                        })}
                       </View>
                     )}
-
-                    {/* More/Less button only for other categories */}
-                    {activeSlug && (
-                      <TouchableOpacity
-                        style={styles.moreButton}
-                        onPress={() => setShowAllSlugs(!showAllSlugs)}
-                      >
-                        <Text style={styles.moreButtonText}>
-                          {showAllSlugs ? "Less" : "More"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </>
-                )}
-              </View>
-
-              {/* Render remaining slugs */}
-              {categoryId === 79 || categoryId === 29
-                ? displaySlugs.length > 1 && (
-                    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                      {displaySlugs.slice(1).map((item, index) => (
-                        <View key={index + 1}>{renderSlug({ item })}</View>
-                      ))}
-                    </View>
-                  )
-                : showAllSlugs &&
-                  otherSlugs.length > 0 && (
-                    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                      {otherSlugs.map((item, index) => (
-                        <View key={index}>{renderSlug({ item })}</View>
-                      ))}
+                </>
+              ) : (
+                <>
+                  {activeSlug && (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", flex: 1 }}>
+                      {renderSlug({ item: activeSlug })}
                     </View>
                   )}
 
-              {/* Extra info for selected slug */}
-              {currentActiveSlug &&
-                currentActiveSlug.id !== 4383 &&
-                renderKeyItemsRow(currentActiveSlug)}
-            </>
-          )}
-        </View>
+                  {activeSlug && (
+                    <TouchableOpacity
+                      style={styles.moreButton}
+                      onPress={() => setShowAllSlugs(!showAllSlugs)}
+                    >
+                      <Text style={styles.moreButtonText}>
+                        {showAllSlugs ? "Less" : "More"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </View>
 
-       <FullScreenZoomableContainer>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={({ item, index }) => (
-              <View
-                style={{
-                  marginBottom: index === messages.length - 1 ? 
-                    (isKeyboardVisible ? keyboardHeight : 100) : 0,
-                }}
-              >
-                {renderChat({ item })}
-              </View>
+            {/* Remaining slugs */}
+            {categoryId === 79 || categoryId === 29 ? (
+              displaySlugs.length > 1 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  {displaySlugs.slice(1).map((item, index) => (
+                    <View key={index + 1}>{renderSlug({ item })}</View>
+                  ))}
+                </View>
+              )
+            ) : (
+              showAllSlugs &&
+              otherSlugs.length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  {otherSlugs.map((item, index) => (
+                    <View key={index}>{renderSlug({ item })}</View>
+                  ))}
+                </View>
+              )
             )}
-            keyExtractor={(item, index) => index.toString()}
-            style={styles.messageList}
-            contentContainerStyle={{ 
-              paddingBottom: isKeyboardVisible ? keyboardHeight : 0,
-              flexGrow: 1 
-            }}
-            keyboardShouldPersistTaps="never"
-            onLayout={() => {
-              // Scroll to show last user message when layout changes
-              if (messages.length >= 2) {
-                const lastUserMsgIndex = messages.length - 2; // User message is second last
-                flatListRef.current?.scrollToIndex({
-                  index: lastUserMsgIndex,
-                  animated: true,
-                  viewPosition: 0, // Position at top of screen
-                });
-              }
-            }}
-            onContentSizeChange={() => {
-              // When new message arrives, scroll to show last user message at top
-              if (messages.length >= 2) {
-                setTimeout(() => {
-                  const lastUserMsgIndex = messages.length - 2;
-                  flatListRef.current?.scrollToIndex({
-                    index: lastUserMsgIndex,
-                    animated: true,
-                    viewPosition: 0, // User message at top, response below
-                  });
-                }, 100);
-              }
-            }}
-            onScrollToIndexFailed={(info) => {
-              // Fallback if scrollToIndex fails
+
+            {/* Key Items Row */}
+            {currentActiveSlug &&
+              currentActiveSlug.id !== 4383 &&
+              renderKeyItemsRow(currentActiveSlug)}
+          </>
+        )}
+      </View>
+
+      {/* ==================== ZOOMABLE CHAT AREA ==================== */}
+      <FullScreenZoomableContainer>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={({ item, index }) => (
+            <View
+              style={{
+                marginBottom:
+                  index === messages.length - 1
+                    ? 130 // enough space for input bar
+                    : 0,
+              }}
+            >
+              {renderChat({ item })}
+            </View>
+          )}
+          keyExtractor={(item, index) => index.toString()}
+          style={styles.messageList}
+          contentContainerStyle={{
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 130,
+            flexGrow: 1,
+          }}
+          keyboardShouldPersistTaps="never"
+          onContentSizeChange={() => {
+            if (messages.length >= 2) {
               setTimeout(() => {
-                flatListRef.current?.scrollToOffset({
-                  offset: info.averageItemLength * info.index,
+                flatListRef.current?.scrollToIndex({
+                  index: messages.length - 2,
                   animated: true,
+                  viewPosition: 0,
                 });
               }, 100);
-            }}
-          />
-        </FullScreenZoomableContainer>
+            }
+          }}
+          onScrollToIndexFailed={(info) => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true,
+              });
+            }, 100);
+          }}
+        />
+      </FullScreenZoomableContainer>
 
-        {/* Footer with dynamic positioning */}
-        <View style={[
-          styles.footer,
-          {
-            bottom: isKeyboardVisible ? keyboardHeight : 0,
-          }
-        ]}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              multiline={true}
-              scrollEnabled={false}
-              placeholder={
-                isRecording ? 'Listening...' : 'Enter your text here'
-              }
-              value={isRecording ? partialText || inputText : inputText}
-              onChangeText={text => {
-                if (!isRecording) {
-                  setInputText(text);
-                }
-              }}
-              onSubmitEditing={() => {
-                if (isGenerating) return;
-
-                if (
-                  currentActiveSlug?.display === 'Clear' ||
-                  currentActiveSlug?.display === 'Clear All' ||
-                  !currentActiveSlug?.id
-                ) {
-                  Alert.alert(
-                    "Please select any one of the Bot's options to continue.",
-                  );
-                  return;
-                }
-                if (isRecording) {
-                  toggleRecording();
-                }
-                sendMessage(isRecording ? partialText : inputText);
-                setShowAllSlugs(false);
-              }}
-              editable={!isRecording}
-              blurOnSubmit={false}
-            />
-            {inputText.length > 0 && (
-              <TouchableOpacity
-                onPress={clearText}
-                style={styles.clearButton}
-              >
-                <Icon name="close" size={22} color="#000" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={toggleRecording}
-              style={[
-                styles.micButton,
-                { backgroundColor: isRecording ? '#FF5733' : '#ffffffff' },
-              ]}
-              disabled={sttStatus === 'Audio config error'}
-            >
-              <Animated.View
-                style={[
-                  styles.micImageContainer,
-                  {
-                    transform: [{ scale: pulseAnim }],
-                    backgroundColor: isRecording
-                      ? 'rgba(255, 87, 51, 0.3)'
-                      : 'transparent',
-                  },
-                ]}
-              >
-                <Image
-                  source={Icons.Icon08}
-                  style={[styles.micImage, { tintColor: '#000' }]}
-                />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
+      {/* ==================== INPUT BAR (FOOTER) ==================== */}
+      <View style={[styles.footer, { bottom: keyboardHeight }]}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            multiline
+            placeholder={isRecording ? "Listening..." : "Enter your text here"}
+            value={isRecording ? partialText || inputText : inputText}
+            onChangeText={(text) => !isRecording && setInputText(text)}
+            onSubmitEditing={() => {
               if (isGenerating) return;
-
-              if (
-                currentActiveSlug?.display === 'Clear' ||
-                currentActiveSlug?.display === 'Clear All' ||
-                !currentActiveSlug?.id
-              ) {
-                Alert.alert(
-                  "Please select any one of the Bot's options to continue.",
-                );
+              if (!currentActiveSlug?.id || currentActiveSlug?.display.includes("Clear")) {
+                Alert.alert("Please select any one of the Bot's options to continue.");
                 return;
               }
-              if (isRecording) {
-                toggleRecording();
-              }
-              sendMessage(inputText);
+              sendMessage(isRecording ? partialText : inputText);
               setShowAllSlugs(false);
             }}
+            editable={!isRecording}
+            blurOnSubmit={false}
+          />
+
+          {inputText.length > 0 && (
+            <TouchableOpacity onPress={clearText} style={styles.clearButton}>
+              <Icon name="close" size={22} color="#000" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={toggleRecording}
             style={[
-              styles.sendButton,
-              isGenerating && { opacity: 0.5 },
+              styles.micButton,
+              { backgroundColor: isRecording ? "#FF5733" : "#fff" },
             ]}
-            disabled={!inputText.trim() || isGenerating}
+            disabled={sttStatus === "Audio config error"}
           >
-            <Image
-              source={Icons.Icon11}
-              style={[styles.sendImage, { tintColor: '#fff' }]}
-            />
+            <Animated.View
+              style={[
+                styles.micImageContainer,
+                {
+                  transform: [{ scale: pulseAnim }],
+                  backgroundColor: isRecording
+                    ? "rgba(255, 87, 51, 0.3)"
+                    : "transparent",
+                },
+              ]}
+            >
+              <Image source={Icons.Icon08} style={[styles.micImage, { tintColor: "#000" }]} />
+            </Animated.View>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          onPress={() => {
+            if (isGenerating) return;
+            if (!currentActiveSlug?.id || currentActiveSlug?.display.includes("Clear")) {
+              Alert.alert("Please select any one of the Bot's options to continue.");
+              return;
+            }
+            if (isRecording) toggleRecording();
+            sendMessage(inputText);
+            setShowAllSlugs(false);
+          }}
+          style={[
+            styles.sendButton,
+            (!inputText.trim() || isGenerating) && { opacity: 0.5 },
+          ]}
+          disabled={!inputText.trim() || isGenerating}
+        >
+          <Image source={Icons.Icon11} style={[styles.sendImage, { tintColor: "#fff" }]} />
+        </TouchableOpacity>
       </View>
-      {renderKeyItemsModal()}
     </View>
-  );
+
+    {/* Key Items Selection Modal */}
+    {renderKeyItemsModal()}
+  </SafeAreaView>
+);
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     marginLeft: 5,
     marginRight: 5,
@@ -1602,9 +1540,11 @@ const styles = StyleSheet.create({
 footer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 22,
     padding: 6,
-    zIndex: 10, // Keep footer above zoomable content
+    zIndex: 10,
+    backgroundColor: "#fff",        // add background
+    borderTopWidth: 1,              // optional but recommended
+    borderTopColor: "#ddd",
   },
   inputContainer: {
     flex: 1,
