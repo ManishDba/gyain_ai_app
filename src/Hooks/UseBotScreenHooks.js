@@ -621,36 +621,77 @@ const useDataScreenHooks = ({ route }) => {
       const matched = matchSlugs.find((item) => item.id === slugToUse?.id);
       const { name, display } = matched || {};
 
-      const directPeriodResult = extractPeriod(query);
-      let periodResult = [];
-      let sqIdOnlyPromises = [];
-      let sqResponses = [];
-      let rawName = "";
-      let replacedName = "";
-      let currentPeriodText = "";
-
-      const hasPeriodInQuery =
-        directPeriodResult && directPeriodResult.length > 0;
-
-      if (!hasPeriodInQuery) {
-        if (savequeryId && savequeryId.length > 0) {
-          sqIdOnlyPromises = savequeryId.map((idValue) =>
-            axiosWl.get(endpoint.savedquerybyid(idValue))
-          );
-
-          sqResponses = await Promise.all(sqIdOnlyPromises);
-
-          rawName = sqResponses?.[0]?.data?.name;
-          replacedName = dateKeywordReplace(rawName);
-
-          const periodFromApi = extractPeriod(replacedName);
-          currentPeriodText = periodFromApi;
-        }
-      } else {
-        currentPeriodText = directPeriodResult;
-        periodResult = directPeriodResult;
+         // keywords that should disable period extraction
+const YEAR_KEYWORDS = [
+  "all year",
+  "all years",
+  "year wise",
+  "yearwise",
+  "year-wise",
+  "year wise report", // optional extensions you can add
+];
+ 
+// helper: returns true if text contains any year-keyword
+function containsYearKeyword(text = "") {
+  const s = String(text || "").toLowerCase();
+  return YEAR_KEYWORDS.some((k) => s.includes(k));
+}
+ 
+  // ------------------ main logic ------------------
+// check direct period in the user query first
+const directPeriodResult = extractPeriod(query);
+let periodResult = [];
+let sqIdOnlyPromises = [];
+let sqResponses = [];
+let rawName = "";
+let replacedName = "";
+let currentPeriodText = "";
+ 
+// If the *user query* explicitly asks for "all year / yearwise", skip period extraction
+const skipBecauseUserAskedYearwise = containsYearKeyword(query);
+ 
+// If user asked yearwise, we won't call extractPeriod anywhere
+if (skipBecauseUserAskedYearwise) {
+  currentPeriodText = [];
+  periodResult = [];
+  sqIdOnlyPromises = [];
+} else {
+  const hasPeriodInQuery = directPeriodResult && directPeriodResult.length > 0;
+ 
+  if (!hasPeriodInQuery) {
+    if (savequeryId && savequeryId.length > 0) {
+      // fetch saved queries
+      sqIdOnlyPromises = savequeryId.map((idValue) =>
+        axiosWl.get(endpoint.savedquerybyid(idValue))
+      );
+ 
+      sqResponses = await Promise.all(sqIdOnlyPromises);
+ 
+      // if multiple saved queries, you might want to iterate — using first as before
+      rawName = sqResponses?.[0]?.data?.name || "";
+ 
+      // If the saved query name contains "all year" / "yearwise", skip extraction too.
+      const skipBecauseSavedQueryIsYearwise = containsYearKeyword(rawName);
+      if (skipBecauseSavedQueryIsYearwise) {
+        currentPeriodText = [];
+        periodResult = [];
         sqIdOnlyPromises = [];
+      } else {
+        // Normal path: replace keywords (like "this year", "last fy", etc.) then extract
+        replacedName = dateKeywordReplace(rawName);
+ 
+        const periodFromApi = extractPeriod(replacedName);
+        currentPeriodText = periodFromApi || [];
+        periodResult = periodFromApi || [];
       }
+    }
+  } else {
+    // user query explicitly contains a period -> use it
+    currentPeriodText = directPeriodResult;
+    periodResult = directPeriodResult;
+    sqIdOnlyPromises = [];
+  }
+}
 
       const sqPromises = sqIndicatorsIds.map((id) =>
         axiosWl.post(endpoint.sqindicators(), {

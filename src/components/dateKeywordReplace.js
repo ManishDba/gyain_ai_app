@@ -220,30 +220,35 @@ export function extractPeriod(inputText) {
     }
   }
  
-  // 2️⃣ DATE RANGE: "5 may to 5 June 2024" or "1 April 2024 to 30 May 2025"
+  // 2️⃣ DATE RANGE: "5 may to 5 June 2024" or "Apr to Nov 2024 and apr to nov 2025"
   if (!foundDate) {
-    const fullRangeRegex =
-      /(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:(\d{4})\s+)?to\s+(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})/i;
+    // Split by "and", "&", "," to handle multiple date ranges
+    const segments = inputText.split(/\s+(?:and|&)\s+/i);
+    
+    for (const segment of segments) {
+      const fullRangeRegex =
+        /(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:(\d{4})\s+)?to\s+(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})/i;
  
-    const rangeMatch = inputText.match(fullRangeRegex);
-    if (rangeMatch) {
-      const [, d1, m1, y1, d2, m2, y2] = rangeMatch;
-      const year1 = y1 || y2; // Use end year if start year is missing
+      const rangeMatch = segment.match(fullRangeRegex);
+      if (rangeMatch) {
+        const [, d1, m1, y1, d2, m2, y2] = rangeMatch;
+        const year1 = y1 || y2; // Use end year if start year is missing
  
-      if (d1 && d2) {
-        // Full date range: "5 may to 5 June 2024"
-        const month1 = monthMap[m1.toLowerCase()];
-        const month2 = monthMap[m2.toLowerCase()];
-        const startDate = new Date(parseInt(year1), month1, parseInt(d1));
-        const endDate = new Date(parseInt(y2), month2, parseInt(d2));
-        addUnique(`${formatFullDate(startDate)} to ${formatFullDate(endDate)}`);
-      } else {
-        // Month-Year range: "Apr 2024 to May 2025"
-        const m1Short = m1.slice(0, 3);
-        const m2Short = m2.slice(0, 3);
-        addUnique(`${m1Short.charAt(0).toUpperCase() + m1Short.slice(1).toLowerCase()} ${year1} to ${m2Short.charAt(0).toUpperCase() + m2Short.slice(1).toLowerCase()} ${y2}`);
+        if (d1 && d2) {
+          // Full date range: "5 may to 5 June 2024"
+          const month1 = monthMap[m1.toLowerCase()];
+          const month2 = monthMap[m2.toLowerCase()];
+          const startDate = new Date(parseInt(year1), month1, parseInt(d1));
+          const endDate = new Date(parseInt(y2), month2, parseInt(d2));
+          addUnique(`${formatFullDate(startDate)} to ${formatFullDate(endDate)}`);
+        } else {
+          // Month-Year range: "Apr 2024 to May 2025"
+          const m1Short = m1.slice(0, 3);
+          const m2Short = m2.slice(0, 3);
+          addUnique(`${m1Short.charAt(0).toUpperCase() + m1Short.slice(1).toLowerCase()} to ${m2Short.charAt(0).toUpperCase() + m2Short.slice(1).toLowerCase()} ${y2}`);
+        }
+        foundDate = true;
       }
-      foundDate = true;
     }
   }
  
@@ -343,6 +348,6 @@ export function extractPeriod(inputText) {
   }
  
   // Return with "Period : " prefix only if results exist
-  return results.length > 0 ? [`Period : ${results.join(" to ")}`] : [];
+  return results.length > 0 ? [`Period : ${results.join(", ")}`] : [];
 }
  

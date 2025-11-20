@@ -31,6 +31,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useSelector } from "react-redux";
 import UseDataScreenHooks from "../Hooks/UseDataScreenHooks";
 import { useNavigation } from "@react-navigation/native";
+import { exportToExcelAndOpen } from '../components/ExportToExcel';
 import { ENV } from "../../env";
 
 export const isValidNumber = (value) => {
@@ -772,27 +773,76 @@ const DataScreen = ({ route }) => {
         );
 
       case "tab":
-        // ✅ Format the entire data before passing to components
-        const formattedData = {
-          ...data,
-          Rows: data?.Rows?.map((row) =>
-            row.map((cell, cellIndex) => {
-              const columnName = data?.Columns?.[cellIndex]?.Name || "";
-              const columnType = data?.Columns?.[cellIndex]?.Type || "";
-              return formatCellValue(cell, columnName, columnType);
-            })
-          ),
-        };
-        const tableComponent = renderTable(formattedData, item.data.tableKey);
+          const totalColumns = data?.Columns?.length || 0;
+          const isTooLarge = totalColumns > 10; // skip table if more than 10 columns
+        const totalRow =data?.Rows?.length || 0
+          // Only format table data if ≤10 columns
+          const formattedData = !isTooLarge
+            ? {
+                ...data,
+                Rows: data?.Rows?.map((row) =>
+                  row.slice(0, 10).map((cell, i) => {
+                    const col = data?.Columns[i] || {};
+                    return formatCellValue(cell, col.Name, col.Type);
+                  })
+                ),
+              }
+            : null;
 
-        return (
-          <View>
-            {tableComponent}
-            {data?.Rows?.length > 0 && data?.Columns?.length > 1 && (
-              <DynamicChart data={formattedData} />
-            )}
-          </View>
-        );
+            const formattedDataForExport = {
+    ...data,
+    Rows: data.Rows.map((row) =>
+      row.map((cell, i) => {
+        const col = data.Columns[i] || {};
+        return formatCellValue(cell, col.Name, col.Type);
+      })
+    ),
+  };
+        
+          // Use the original tableKey from item.data
+          const tableKey = item.data?.tableKey;
+        
+          return (
+            <View>
+              {isTooLarge ? (
+                <View
+                  style={{
+                    alignSelf: "flex-start",
+                    maxWidth: "95%",
+                    marginVertical: 4,
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: "#e2e3e5",
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: "#000", marginBottom: 10 }}>
+                  Displaying {totalRow > totalColumns ? totalRow+` rows` :totalColumns+ ` columns`} exceeds the limit. Click View All to see the full table.       
+                  </Text>
+      
+                    <TouchableOpacity
+                    onPress={() => exportToExcelAndOpen(formattedDataForExport)}
+                    style={[styles.downloadButton, { backgroundColor: "#217346" }]}
+                  >
+                    <Text style={[styles.downloadButtonText, { color: "#fff" }]}>
+                    View in Excel             
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  {/* Table rendering with the same tableKey */}
+                  {renderTable(formattedData, tableKey)}
+        
+                  {/* Chart rendering */}
+                  {data?.Rows?.length > 0 && totalColumns > 1 && (
+                    <DynamicChart data={formattedData} />
+                  )}
+                </>
+              )}
+            </View>
+          );        
+ 
+ 
 
       default:
         return (
@@ -1896,6 +1946,20 @@ footer: {
     fontWeight: "500",
     fontSize: 16,
   },
+  downloadButton: {
+    backgroundColor: "#28A745", // Excel green
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  downloadButtonText: {
+    color: "#fff",       // white text
+    fontSize: 16,
+    fontWeight: "bold",
+  }
 });
 
 export default DataScreen;
