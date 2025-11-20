@@ -783,8 +783,7 @@ const DataScreen = ({ route }) => {
             })
           ),
         };
-
-        const tableComponent = renderTable(formattedData, `table_${index}`);
+        const tableComponent = renderTable(formattedData, item.data.tableKey);
 
         return (
           <View>
@@ -811,24 +810,25 @@ const DataScreen = ({ route }) => {
     }
   };
 
-  const renderTable = (data, tableKey) => {
+const renderTable = (data, tableKey) => {
     const periodTextData =
       data?.periodText || periodTextsByTable[tableKey] || "";
-
+ 
     const periodText = Array.isArray(periodTextData)
       ? periodTextData.join(", ")
       : typeof periodTextData === "object"
       ? JSON.stringify(periodTextData)
       : String(periodTextData || "");
-
+ 
     const columnWidths = calculateColumnWidths(data);
     const footerRow = generateFooterRowWithInference(data);
     const showFooter = !isOnlyTotalNonEmpty(footerRow);
-
+ 
     const totalRows = data?.Rows?.length || 0;
     const showPagination = totalRows > 7;
     const currentPage = paginationState[tableKey] || 1;
-
+ 
+    // Filter rows based on all active filters
     const activeFilters = filtersByTable[tableKey] || {};
     const activeColumns = activeFilterColumnsByTable[tableKey] || [];
     const filteredRows = applyFilters(
@@ -836,19 +836,20 @@ const DataScreen = ({ route }) => {
       data?.Columns || [],
       tableKey
     );
-
+ 
+    // Get current sort state for this table
     const sortState = sortStateByTable[tableKey] || {
       column: null,
       direction: "asc",
     };
-
+ 
     // Sort filtered rows if a column is selected
     let sortedRows = [...filteredRows];
     if (sortState.column !== null) {
       sortedRows.sort((a, b) => {
         let aVal = a[sortState.column];
         let bVal = b[sortState.column];
-
+ 
         // Handle null/undefined/empty values
         if (
           aVal === null ||
@@ -864,11 +865,11 @@ const DataScreen = ({ route }) => {
           bVal === "Unknown"
         )
           return -1;
-
+ 
         // Convert to number if it's a valid number
         let aNum = null;
         let bNum = null;
-
+ 
         // Check if value is already a number
         if (typeof aVal === "number") {
           aNum = aVal;
@@ -879,7 +880,7 @@ const DataScreen = ({ route }) => {
             aNum = parseFloat(cleanA);
           }
         }
-
+ 
         if (typeof bVal === "number") {
           bNum = bVal;
         } else if (typeof bVal === "string") {
@@ -889,22 +890,22 @@ const DataScreen = ({ route }) => {
             bNum = parseFloat(cleanB);
           }
         }
-
+ 
         // If both are numbers, do numeric comparison
         if (aNum !== null && bNum !== null) {
           return sortState.direction === "asc" ? aNum - bNum : bNum - aNum;
         }
-
+ 
         // If one is number and other is not, number comes first
         if (aNum !== null && bNum === null)
           return sortState.direction === "asc" ? -1 : 1;
         if (aNum === null && bNum !== null)
           return sortState.direction === "asc" ? 1 : -1;
-
+ 
         // String comparison for non-numeric values
         const aStr = String(aVal).toLowerCase();
         const bStr = String(bVal).toLowerCase();
-
+ 
         if (sortState.direction === "asc") {
           return aStr.localeCompare(bStr);
         } else {
@@ -912,9 +913,9 @@ const DataScreen = ({ route }) => {
         }
       });
     }
-
+ 
     let paginatedRows, totalPages, itemsPerPage;
-
+ 
     if (showPagination) {
       const paginationData = renderPaginationControls(sortedRows.length);
       totalPages = paginationData.totalPages;
@@ -926,15 +927,15 @@ const DataScreen = ({ route }) => {
       totalPages = 1;
       itemsPerPage = sortedRows.length;
     }
-
+ 
     const handlePageChange = (newPage) => {
       setPaginationState((prev) => ({ ...prev, [tableKey]: newPage }));
     };
-
+ 
     const handleSort = (columnIndex) => {
       setSortStateByTable((prev) => {
         const currentSort = prev[tableKey] || { column: null, direction: null };
-
+ 
         if (currentSort.column === columnIndex) {
           // Same column - cycle through: asc -> desc -> remove
           if (currentSort.direction === "asc") {
@@ -956,7 +957,7 @@ const DataScreen = ({ route }) => {
             };
           }
         }
-
+ 
         // New column or no sort - start with ascending
         return {
           ...prev,
@@ -969,7 +970,7 @@ const DataScreen = ({ route }) => {
       // Reset to first page when sorting changes
       handlePageChange(1);
     };
-
+ 
     const getSortIcon = (columnIndex) => {
       if (sortState.column !== columnIndex) {
         return null;
@@ -980,19 +981,19 @@ const DataScreen = ({ route }) => {
         <Icon name="arrow-down" size={16} color="#fff" />
       );
     };
-
+ 
     const getTextAlignment = (value) => {
       if (value === null || value === undefined || value === "") return "right";
-
+ 
       if (typeof value === "number") return "right";
-
+ 
       const stringValue = String(value).replace(/,/g, "");
       if (!isNaN(stringValue) && !isNaN(parseFloat(stringValue)))
         return "right";
-
+ 
       return "left";
     };
-
+ 
     const formatHeaderName = (name) => {
       if (!name) return "";
       // Replace underscores with spaces and capitalize words
@@ -1004,21 +1005,20 @@ const DataScreen = ({ route }) => {
         )
         .join(" ");
     };
-
+ 
     const wrapLongText = (text, maxLength = 30) => {
       if (!text) return "";
       const str = String(text);
       return str.replace(new RegExp(`(.{${maxLength}})`, "g"), "$1\n");
     };
-
     return (
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator>
           <View style={{ minWidth: "98%" }}>
             <View style={styles.tableContainer}>
               {periodText && (
-                <Text style={styles.periodTextcell}>{periodText}</Text>
-              )}
+                <Text style={styles.hedingPeriod}>{periodText}</Text>
+              )}{" "}
               <View style={[styles.tableRow, styles.tableHeaderRow]}>
                 {data?.Columns?.map((c, index) => (
                   <View
@@ -1059,7 +1059,7 @@ const DataScreen = ({ route }) => {
                           <Icon name="magnify" size={20} color="#fff" />
                         )}
                       </TouchableOpacity>
-
+ 
                       {activeColumns.includes(c.Name) ? (
                         <TextInput
                           style={[
@@ -1108,22 +1108,25 @@ const DataScreen = ({ route }) => {
                   </View>
                 ))}
               </View>
-
               {paginatedRows.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.tableRow}>
                   {row.map((cell, cellIndex) => {
                     const columnName = data?.Columns?.[cellIndex]?.Name || "";
                     const columnType = data?.Columns?.[cellIndex]?.Type || "";
-
-                    const displayValue = String(cell);
+ 
+                    const displayValue = formatCellValue(
+                      cell,
+                      columnName,
+                      columnType
+                    );
                     const wrappedValue = wrapLongText(String(displayValue), 40);
-
+ 
                     const numericValue = isValidNumber(cell)
                       ? typeof cell === "number"
                         ? cell
                         : parseFloat(String(cell).replace(/,/g, ""))
                       : null;
-
+ 
                     return (
                       <View
                         key={cellIndex}
@@ -1156,7 +1159,6 @@ const DataScreen = ({ route }) => {
                   })}
                 </View>
               ))}
-
               {showFooter && (
                 <View style={[styles.tableRow, styles.tableFooterRow]}>
                   {footerRow.map((cell, cellIndex) => (
@@ -1210,7 +1212,7 @@ const DataScreen = ({ route }) => {
             >
               <Text style={styles.pageButtonText}>««</Text>
             </TouchableOpacity>
-
+ 
             <TouchableOpacity
               onPress={() => handlePageChange(Math.max(currentPage - 1, 1))}
               disabled={currentPage === 1}
@@ -1221,11 +1223,11 @@ const DataScreen = ({ route }) => {
             >
               <Text style={styles.pageButtonText}>«</Text>
             </TouchableOpacity>
-
+ 
             <Text style={styles.pageInfo}>
               Page {currentPage} of {totalPages}
             </Text>
-
+ 
             <TouchableOpacity
               onPress={() =>
                 handlePageChange(Math.min(currentPage + 1, totalPages))
@@ -1238,7 +1240,7 @@ const DataScreen = ({ route }) => {
             >
               <Text style={styles.pageButtonText}>»</Text>
             </TouchableOpacity>
-
+ 
             <TouchableOpacity
               onPress={() => handlePageChange(totalPages)}
               disabled={currentPage === totalPages}
@@ -1615,7 +1617,7 @@ footer: {
     borderColor: "#000000",
     borderRadius: 8,
     overflow: "hidden",
-    marginBottom: 50,
+    // marginBottom: 50,
   },
   tableRow: {
     flexDirection: "row",
@@ -1886,6 +1888,13 @@ footer: {
     color: "#000000ff",
     textAlign: "center",
     fontWeight: "500",
+  },
+  hedingPeriod: {
+    padding: 5,
+    backgroundColor: "#E0E0E0",
+    color: "#000000",
+    fontWeight: "500",
+    fontSize: 16,
   },
 });
 

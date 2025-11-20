@@ -167,31 +167,87 @@ export function extractPeriod(inputText) {
       year: "numeric",
     });
  
-  // 1️⃣ RANGE: "1 April 2024 to 30 May 2025" or "Apr 2024 to May 2025"
-  const fullRangeRegex =
-    /(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})\s+to\s+(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})/i;
+  // SPECIAL KEYWORDS - Check these first
+  if (/\b(all years?|year wise)\b/i.test(inputText)) {
+    // All years / year wise: return empty (no period text)
+    return [];
+  }
  
-  const rangeMatch = inputText.match(fullRangeRegex);
-  if (rangeMatch) {
-    const [, d1, m1, y1, d2, m2, y2] = rangeMatch;
- 
-    if (d1 && d2) {
-      // Full date range: "1 Apr 2024 to 30 May 2025"
-      const month1 = monthMap[m1.toLowerCase()];
-      const month2 = monthMap[m2.toLowerCase()];
-      const startDate = new Date(parseInt(y1), month1, parseInt(d1));
-      const endDate = new Date(parseInt(y2), month2, parseInt(d2));
-      addUnique(`${formatFullDate(startDate)} to ${formatFullDate(endDate)}`);
-    } else {
-      // Month-Year range: "Apr 2024 to May 2025"
-      const m1Short = m1.slice(0, 3);
-      const m2Short = m2.slice(0, 3);
-      addUnique(`${m1Short.charAt(0).toUpperCase() + m1Short.slice(1).toLowerCase()} ${y1} to ${m2Short.charAt(0).toUpperCase() + m2Short.slice(1).toLowerCase()} ${y2}`);
-    }
+  if (/\bcurrent year\b/i.test(inputText)) {
+    // Current year: 1 April current year to today
+    const today = new Date();
+    const currentFYStart = new Date(today.getFullYear(), 3, 1); // 1 Apr
+    addUnique(`${formatFullDate(currentFYStart)} to ${formatFullDate(today)}`);
     foundDate = true;
   }
  
-  // 2️⃣ FULL DATE: "1 Nov 2025" or "1-Nov-2025"
+  if (!foundDate && /\b(last ye?a?r|previous ye?a?r|prev ye?a?r)\b/i.test(inputText)) {
+    // Last year / Previous year: 1 April last year to 31 March current year
+    const lastYearStart = new Date(currentYear - 1, 3, 1); // 1 Apr last year
+    const lastYearEnd = new Date(currentYear, 2, 31); // 31 Mar current year
+    addUnique(`${formatFullDate(lastYearStart)} to ${formatFullDate(lastYearEnd)}`);
+    foundDate = true;
+  }
+ 
+  // 1️⃣ FINANCIAL YEAR: "FY 2024 | 2025" or "FY 2024-2025" or "2023-24"
+  if (!foundDate) {
+    // Match FY with pipe separator: "FY 2024 | 2025"
+    const fyPipeRegex = /\b(?:FY|Fin(?:ancial)?\s?Year\s*)?(\d{4})\s*\|\s*(\d{4})\b/gi;
+    const fyPipeMatch = inputText.match(fyPipeRegex);
+    if (fyPipeMatch) {
+      for (const fy of fyPipeMatch) {
+        const match = fy.match(/(\d{4})\s*\|\s*(\d{4})/);
+        if (match) {
+          addUnique(`${match[1]}-${match[2]}`);
+          foundDate = true;
+        }
+      }
+    }
+ 
+    // Match standard FY format: "FY 2023-2024" or "2023-24"
+    if (!foundDate) {
+      const financialYearRegex = /\b(?:FY|Fin(?:ancial)?\s?Year\s*)?(\d{4})[-\/–](\d{2,4})\b/gi;
+      const financialYearMatches = inputText.match(financialYearRegex) || [];
+      for (const fy of financialYearMatches) {
+        const match = fy.match(/(\d{4})[-\/–](\d{2,4})/);
+        if (match) {
+          const s = +match[1];
+          const e = match[2].length === 2 ? +(match[1].slice(0, 2) + match[2]) : +match[2];
+          addUnique(`${s}-${e}`);
+          foundDate = true;
+        }
+      }
+    }
+  }
+ 
+  // 2️⃣ DATE RANGE: "5 may to 5 June 2024" or "1 April 2024 to 30 May 2025"
+  if (!foundDate) {
+    const fullRangeRegex =
+      /(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:(\d{4})\s+)?to\s+(\d{1,2})?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})/i;
+ 
+    const rangeMatch = inputText.match(fullRangeRegex);
+    if (rangeMatch) {
+      const [, d1, m1, y1, d2, m2, y2] = rangeMatch;
+      const year1 = y1 || y2; // Use end year if start year is missing
+ 
+      if (d1 && d2) {
+        // Full date range: "5 may to 5 June 2024"
+        const month1 = monthMap[m1.toLowerCase()];
+        const month2 = monthMap[m2.toLowerCase()];
+        const startDate = new Date(parseInt(year1), month1, parseInt(d1));
+        const endDate = new Date(parseInt(y2), month2, parseInt(d2));
+        addUnique(`${formatFullDate(startDate)} to ${formatFullDate(endDate)}`);
+      } else {
+        // Month-Year range: "Apr 2024 to May 2025"
+        const m1Short = m1.slice(0, 3);
+        const m2Short = m2.slice(0, 3);
+        addUnique(`${m1Short.charAt(0).toUpperCase() + m1Short.slice(1).toLowerCase()} ${year1} to ${m2Short.charAt(0).toUpperCase() + m2Short.slice(1).toLowerCase()} ${y2}`);
+      }
+      foundDate = true;
+    }
+  }
+ 
+  // 3️⃣ FULL DATE: "1 Nov 2025" or "1-Nov-2025"
   if (!foundDate) {
     const dayMonthYearRegex =
       /\b(\d{1,2})[-\s](Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[-\s](\d{4})\b/gi;
@@ -211,7 +267,7 @@ export function extractPeriod(inputText) {
     }
   }
  
-  // 3️⃣ NUMERIC DATE: "1/10/2025" or "2025-10-1"
+  // 4️⃣ NUMERIC DATE: "1/10/2025" or "2025-10-1"
   if (!foundDate) {
     const numericDateRegex =
       /\b\d{1,2}[-\/.\s]\d{1,2}[-\/.\s]\d{2,4}\b|\b\d{4}[-\/.\s]\d{1,2}[-\/.\s]\d{1,2}\b/g;
@@ -241,7 +297,7 @@ export function extractPeriod(inputText) {
     }
   }
  
-  // 4️⃣ MONTH + YEAR: "Oct 2025" or "October-2025"
+  // 5️⃣ MONTH + YEAR: "Oct 2025" or "October-2025"
   if (!foundDate) {
     const monthYearRegex =
       /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[\s\-_/.,]*(\d{4})\b/gi;
@@ -262,7 +318,7 @@ export function extractPeriod(inputText) {
     }
   }
  
-  // 5️⃣ ONLY MONTH NAME: "October" → "Oct {currentYear}"
+  // 6️⃣ ONLY MONTH NAME: "October" → "Oct {currentYear}"
   if (!foundDate) {
     const monthOnlyRegex =
       /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/i;
@@ -276,7 +332,7 @@ export function extractPeriod(inputText) {
     }
   }
  
-  // 6️⃣ ONLY YEAR: "2024" → "2024" (no date shown)
+  // 7️⃣ ONLY YEAR: "2024" → "2024"
   if (!foundDate) {
     const yearOnlyRegex = /\b(20\d{2}|19\d{2})\b/;
     const yearMatch = inputText.match(yearOnlyRegex);
@@ -286,42 +342,7 @@ export function extractPeriod(inputText) {
     }
   }
  
-  // 7️⃣ FINANCIAL YEAR: "FY 2023-2024" or "2023-24"
-  if (!foundDate) {
-    const financialYearRegex = /\b(?:FY|Fin(?:ancial)?\s?Year\s*)?(\d{4})[-\/–](\d{2,4})\b/gi;
-    const financialYearMatches = inputText.match(financialYearRegex) || [];
-    for (const fy of financialYearMatches) {
-      const match = fy.match(/(\d{4})[-\/–](\d{2,4})/);
-      if (match) {
-        const s = +match[1];
-        const e = match[2].length === 2 ? +(match[1].slice(0, 2) + match[2]) : +match[2];
-        addUnique(`${s}–${e}`);
-        foundDate = true;
-      }
-    }
-  }
- 
-   // 8️⃣ SPECIAL KEYWORDS
-   if (!foundDate) {
-    if (/\bcurrent year\b/i.test(inputText)) {
-      // Current year: 1 April 2025 to today
-      const today = new Date();
-      const currentFYStart = new Date(today.getFullYear(), 3, 1); // 1 Apr current year
-      addUnique(`${formatFullDate(currentFYStart)} to ${formatFullDate(today)}`);
-      foundDate = true;
-    } else if (/\b(last year|previous year|prev year)\b/i.test(inputText)) {
-      // Last year / Previous year: 1 April 2024 to 31 March 2025 (only once)
-      const lastYearStart = new Date(currentYear - 1, 3, 1); // 1 Apr last year
-      const lastYearEnd = new Date(currentYear, 2, 31); // 31 Mar current year
-      addUnique(`${formatFullDate(lastYearStart)} to ${formatFullDate(lastYearEnd)}`);
-      foundDate = true;
-    } else if (/\ball years?\b/i.test(inputText)) {
-      // All years: show nothing (empty period)
-      foundDate = true;
-      return [];
-    }
-  }
- 
- 
+  // Return with "Period : " prefix only if results exist
   return results.length > 0 ? [`Period : ${results.join(" to ")}`] : [];
 }
+ 

@@ -1934,7 +1934,7 @@ const useDataScreenHooks = ({ route }) => {
     setActiveFilterColumnsByTable((prev) => {
       const prevForTable = prev[tableKey] || [];
       let updatedForTable;
-
+ 
       if (prevForTable.includes(columnName)) {
         updatedForTable = prevForTable.filter((col) => col !== columnName);
         setFiltersByTable((filters) => {
@@ -1949,11 +1949,11 @@ const useDataScreenHooks = ({ route }) => {
       } else {
         updatedForTable = [...prevForTable, columnName];
       }
-
+ 
       return { ...prev, [tableKey]: updatedForTable };
     });
   };
-
+  
   const handleFilterChange = (tableKey, columnName, value, onPageChange) => {
     setFiltersByTable((prev) => ({
       ...prev,
@@ -1962,24 +1962,23 @@ const useDataScreenHooks = ({ route }) => {
         [columnName]: value,
       },
     }));
-
     if (onPageChange) onPageChange(1);
-  };
+  };  
 
   const applyFilters = (rows = [], columns = [], tableKey) => {
     const tableFilters = filtersByTable[tableKey] || {};
-
+ 
     return rows.filter((row) =>
       columns.every((col, colIndex) => {
         const rawFilterValue = tableFilters[col.Name] || "";
         if (!rawFilterValue) return true;
-
+ 
         const filterValue = rawFilterValue.replace(/[.,\s]/g, "").toLowerCase();
         const cellRaw = row[colIndex];
         const cellValue = String(cellRaw || "")
           .replace(/[.,\s]/g, "")
           .toLowerCase();
-
+ 
         return cellValue.includes(filterValue);
       })
     );
